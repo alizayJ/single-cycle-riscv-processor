@@ -1,0 +1,38 @@
+//========================================================
+// DATA MEMORY  ? Big-endian (matches your IMEM layout)
+//========================================================
+module data_mem(
+    input  logic        clk, memwrite,
+    input  logic [31:0] alu_result,      // address (from ALU)
+    input  logic [31:0] RD2,     // write data (from register file)
+    output logic [31:0] RD      // read data (to register file)
+);
+    logic [7:0] memory [0:255]; // 256 bytes of memory
+
+    // READ ? MSB at lowest address
+    assign RD = {memory[alu_result+3], memory[alu_result+2], memory[alu_result+1], memory[alu_result]};
+
+    // WRITE ? MSB at lowest address
+    always_ff @(posedge clk)
+        if (memwrite) begin
+            memory[alu_result+3]   <= RD2[31:24];
+            memory[alu_result+2] <= RD2[23:16];
+            memory[alu_result+1] <= RD2[15:8];
+            memory[alu_result] <= RD2[7:0];
+        end
+endmodule
+// MUX: select data to write back to register file
+
+module memtoreg_mux(
+    input  logic [31:0] alu_result, // ALU output 
+    input  logic [31:0] RD,  // data read from data memory
+    input  logic  result_src,       // control: 0 -> alu_result, 1 -> read_data
+    output logic [31:0] W_Data          // write data for register file (matches RF's WD)
+);
+    assign W_Data = (result_src) ? RD : alu_result;
+endmodule
+
+
+
+
+

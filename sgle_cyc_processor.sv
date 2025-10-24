@@ -1,0 +1,161 @@
+module sgle_cyc_processor(input logic clk,rst, input logic [31:0] pc_next, 
+output logic [31:0] pc, output logic [31:0] instruction, alu_result, output logic regwrite, alu_src, memwrite, result_src, branch, jump, pc_src,
+output logic [2:0] ALUControl,  output logic [1:0] imm_src);
+
+// intermediate 
+logic zero;
+logic [31:0] W_Data;
+logic [31:0] RD1,RD2,RD; //RD output of datamem
+logic [31:0] imm,srcb;
+
+//temp  
+
+//pc_top(combine pc)
+pc_top pc_counter1(
+    .clk(clk),
+    .rst(rst),
+    .pc_src(pc_src),    
+    .imm(imm),              
+    .pc(pc),
+    .pc_next(pc_next)
+);
+
+
+//Instruction memory
+ins_mem ins_mem2(
+.addr(pc),
+.instruction(instruction)
+);
+
+
+// control unit
+control_unit cu3(
+         .ins      (instruction),
+        .zero      (zero),
+        .regwrite (regwrite),
+        .alu_src   (alu_src),
+        .memwrite  (memwrite),
+        .result_src(result_src),
+        .imm_src   (imm_src),
+        .branch    (branch),
+        .jump      (jump),
+        .pc_src    (pc_src),
+        .ALUControl (ALUControl)
+);
+
+
+//register file
+register_file reg_file4(
+.clk(clk),
+.regwrite(regwrite),
+.instruction(instruction),
+.W_Data(W_Data),
+.RD1(RD1),
+.RD2(RD2)
+);
+
+imm_data immdata5(
+    .ins(instruction),
+    .imm_src(imm_src),
+    .imm(imm)
+);
+
+alu_mux alu_mux6(
+.RD2(RD2),
+.imm(imm),
+.alu_src(alu_src),
+.srcb(srcb)
+);
+
+alu alu7(
+.RD1(RD1),
+.srcb(srcb),
+.ALUControl(ALUControl),
+.alu_result(alu_result),
+.zero(zero)
+);
+
+imm_data uut(
+    .ins(instruction),
+    .imm_src(imm_src),
+    .imm(imm)
+);
+
+data_mem data_mem(
+.clk(clk),
+.memwrite(memwrite),
+.alu_result(alu_result),
+.RD2(RD2),
+.RD(RD)
+);
+
+
+memtoreg_mux mux_res(
+.alu_result(alu_result),
+.result_src(result_src),
+.RD(RD),
+.W_Data(W_Data)
+);
+endmodule
+
+//instruction memory module
+module ins_mem(input logic [31:0] addr,
+output logic [31:0] instruction);
+
+logic [7:0] ins_mem [4095:0];
+//[addr] [data]
+//118 FE420AE3
+//114 0062E233
+//110 0064A423
+//10C FFC4A303
+//108 FE54AE23
+//104 00500293
+//100 00900493
+
+initial begin
+$readmemb("./ins.bin",ins_mem,32'h00000100,32'h0000011B); //("file", array_name, start_addr, end_addr)
+end
+assign instruction = {ins_mem[addr], ins_mem[addr+1], ins_mem[addr+2], ins_mem[addr+3]}; //MSB--> LSB
+endmodule 
+
+
+
+//testbench
+module sgle_cyc_processor_tb();
+reg clk,rst;
+wire [31:0] pc_next;
+wire [31:0] pc, instruction;
+wire regwrite, alu_src, memwrite, result_src, branch, jump, pc_src;
+wire [1:0] imm_src;
+wire [2:0] ALUControl;
+wire [31:0] alu_result;
+
+sgle_cyc_processor dut(
+.clk(clk),
+.rst(rst),
+.pc(pc),
+.pc_next(pc_next),
+.instruction(instruction),
+.regwrite (regwrite),
+.alu_src   (alu_src),
+.memwrite  (memwrite),
+.result_src(result_src),
+.imm_src   (imm_src),
+.branch    (branch),
+.jump      (jump),
+.pc_src    (pc_src),
+.ALUControl (ALUControl),
+.alu_result(alu_result)
+);
+
+initial 
+clk = 0;
+always #5 clk =~clk;
+  initial begin
+    rst = 1;
+    #10;
+    rst = 0;
+repeat (10) @(posedge clk);
+$finish;
+  end
+endmodule
